@@ -1,0 +1,98 @@
+<!DOCTYPE html><html lang="zh-CN"><head>
+<meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>1688发链接查5%手续费</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f4f7;color:#1f2933;padding:24px 14px 60px;}
+  .app{max-width:520px;margin:0 auto;}
+  h1{font-size:22px;margin-bottom:6px;}
+  .sub{font-size:13px;color:#6b7480;margin-bottom:18px;line-height:1.7;}
+  .card{background:#fff;border-radius:14px;padding:18px;box-shadow:0 14px 40px rgba(20,28,38,.09);margin-bottom:16px;}
+  textarea{width:100%;height:88px;font-size:14px;border:1.5px solid #d6dbe2;border-radius:10px;padding:10px;color:#1f2933;resize:vertical;}
+  .btn{width:100%;border:none;border-radius:12px;font-size:17px;font-weight:700;padding:14px;background:#2c6fd9;color:#fff;margin-top:12px;cursor:pointer;}
+  .btn:active{opacity:.85;}
+  .res{margin-top:14px;border-radius:12px;padding:14px;font-size:15px;line-height:1.8;display:none;}
+  .res.red{background:#fdecec;color:#b52c2c;display:block;}
+  .res.green{background:#e9f7ee;color:#1c7a3e;display:block;}
+  .res.yellow{background:#fdf5e3;color:#8a6116;display:block;}
+  .tip{font-size:12px;color:#8a94a0;line-height:1.8;}
+  #sync{font-size:12px;color:#9aa3ad;margin-top:10px;}
+  footer{font-size:12px;color:#9aa3ad;line-height:1.8;text-align:center;margin-top:10px;}
+</style>
+</head><body>
+<div class="app">
+  <h1>🔍 1688 链接待发检查</h1>
+  <div class="sub">把准备发给客户的<b>1688商品链接</b>（或纯数字商品编号）粘到下面，点查询。<br>红=这个商品加了严选/WOW等收费服务，下单扣5%，<b>别发</b>；绿=没加，放心发。</div>
+  <div class="card">
+    <textarea id="input" placeholder="粘贴商品链接，例如：&#10;https://detail.1688.com/offer/123456789012.html&#10;或者只粘编号：123456789012"></textarea>
+    <button class="btn" id="btn">查一查，能不能发</button>
+    <div class="res" id="res"></div>
+    <div id="sync"></div>
+  </div>
+  <div class="card"><div class="tip"><b>名单说明：</b>扣费名单来自卖家后台实测（严选/WOW/行家选全量），每天晚上8点自动同步一次。白天刚新加的要到晚上才认出。<br><b>另注：</b>就算链接是绿的，客户用<b>信用卡/花呗</b>付款平台会另收<b>0.6%</b>、用<b>先采后付</b>会另收<b>0.5%</b>——这两个跟链接无关，任何订单都可能产生。</div></div>
+  <footer>数据源：GitHub 公开名单（只含商品编号和名字，无隐私）。本页面不收集、不上传任何信息。</footer>
+</div>
+<script>
+(function(){ 'use strict';
+  var KEY = 'wy1688-checker-list-v1';
+  var URLS = [
+    'https://cdn.jsdelivr.net/gh/kk2026-code/1688-tools@main/fee_flag_list.json',
+    'https://raw.githubusercontent.com/kk2026-code/1688-tools/main/fee_flag_list.json'
+  ];
+  var remote = null;
+
+  function getId(s){
+    s = String(s||'');
+    var m = s.match(/offer\/(\d+)/) || s.match(/offerId=(\d+)/) || s.match(/offerId%3[Dd](\d+)/);
+    if(!m){ m = s.match(/(\d{10,})/); }
+    return m ? m[1] : '';
+  }
+  function loadCache(){
+    try{
+      var d = JSON.parse(localStorage.getItem(KEY));
+      if(d && d.flagged){ remote = d; showSync('名单缓存：' + (d.updatedAt||'') + '（离线兜底）'); }
+    }catch(e){}
+  }
+  function showSync(t){ document.getElementById('sync').textContent = t; }
+
+  function fetchList(i){
+    if(i >= URLS.length){
+      if(remote){ showSync('在线名单没拉到，用的本地缓存：' + (remote.updatedAt||'')); }
+      else{ showSync('名单没拉到（可稍后刷新重试），当前只按内置兜底判断'); }
+      return;
+    }
+    fetch(URLS[i] + '?t=' + Date.now()).then(function(r){ return r.json(); }).then(function(j){
+      if(j && j.flagged){
+        remote = j;
+        try{ localStorage.setItem(KEY, JSON.stringify(j)); }catch(e){}
+        showSync('名单已更新：' + (j.updatedAt||'') + '，共 ' + Object.keys(j.flagged).length + ' 个扣费商品');
+      }else{ fetchList(i+1); }
+    }).catch(function(){ fetchList(i+1); });
+  }
+
+  function doCheck(){
+    var raw = document.getElementById('input').value;
+    var id = getId(raw);
+    var res = document.getElementById('res');
+    function show(cls, html){ res.className = 'res ' + cls; res.innerHTML = html; }
+    if(!id){
+      show('yellow', '⚠️ 没认出商品编号<br>粘的是不是1688商品链接？整条粘进来，或只粘那串纯数字编号。');
+      return;
+    }
+    var e = (remote && remote.flagged && remote.flagged[id]) || null;
+    if(e){
+      show('red', '⛔ 停！扣5%手续费！<br><b>' + e + '</b><br>客户在这个链接下单，扣成交金额5%；客户若用信用卡/花呗付款，还会再加0.6%。<br><b>别发这个链接，换同款没加服务的链接发！</b>');
+    }else{
+      show('green', '✅ 放心发！这个商品没加严选/WOW/行家选<br>（名单每天晚上8点自动同步，白天刚加的要到晚上才认出）<br>另注：客户用信用卡/花呗付款另收0.6%、用先采后付另收0.5%——跟链接无关，任何订单都可能产生。');
+    }
+  }
+
+  document.getElementById('btn').addEventListener('click', doCheck);
+  document.getElementById('input').addEventListener('keydown', function(ev){
+    if((ev.metaKey || ev.ctrlKey) && ev.key === 'Enter') doCheck();
+  });
+  loadCache();
+  fetchList(0);
+})();
+</script>
+</body></html>
